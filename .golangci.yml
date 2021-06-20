@@ -1,0 +1,30 @@
+linters:
+  enable-all: true
+  disable:
+  - gochecknoinits
+  - gochecknoglobals
+  - goconst
+  - wsl
+  - lll
+  - goerr113
+  - goprintffuncname
+  - gomnd
+  - nlreturn
+  - gosec
+  - exhaustivestruct
+  - interfacer
+  - maligned
+  - scopelint
+  - golint
+
+output:
+  format: tab
+
+run:
+  timeout: 10s
+
+linters-settings:
+  nestif:
+    min-complexity: 10
+  gci:
+    local-prefixes: github.com/shaunschembri/restreamer

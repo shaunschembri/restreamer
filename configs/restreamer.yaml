@@ -1,0 +1,12 @@
+max-bandwidth: 10
+read-buffer: 1
+
+server:
+  address: 127.0.0.1
+  port: 1230
+
+download:
+  path: .
+
+streams:
+  nasatv1: https://ntv1.akamaized.net/hls/live/2014075/NASA-NTV1-HLS/master.m3u8
