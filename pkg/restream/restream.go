@@ -2,13 +2,15 @@ package restream
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
-	"net/http"
 	"time"
 
 	"github.com/grafov/m3u8"
+
+	"github.com/shaunschembri/restreamer/pkg/restream/provider"
+	"github.com/shaunschembri/restreamer/pkg/restream/provider/hls"
+	"github.com/shaunschembri/restreamer/pkg/restream/request"
 )
 
 func (r Restream) Start(ctx context.Context, playlistURL string) error {
@@ -50,44 +52,22 @@ func (r Restream) displayStats() {
 		statsString += fmt.Sprintf(" | Decrypter %s", r.decrypter.info())
 	}
 
-	log.Printf("%s | Playlist Type %s", statsString, r.SegmentProvider.Info())
+	log.Printf("%s | Playlist Type: %s", statsString, r.SegmentProvider.Info())
 }
 
-func (r *Restream) getSegmentProvider(ctx context.Context, playlistURL string) error {
-	hlsMedia := hlsMedia{
-		request: request{
-			userAgent: r.UserAgent,
-			client:    &http.Client{},
-		},
-		mediaPlaylistURL: playlistURL,
-	}
-
-	playlist, err := hlsMedia.getPlaylist(ctx)
+func (r *Restream) detectStream(ctx context.Context, playlistURL, userAgent string, maxBandwidth uint32) (provider.Provider, error) {
+	request := request.New(userAgent)
+	playlist, err := hls.GetPlaylist(ctx, request, playlistURL)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("cannot get playlist: %w", err)
 	}
 
-	if playlist.listType == m3u8.MEDIA {
-		r.SegmentProvider = &hlsMedia
-		return nil
+	switch playlist.Type() {
+	case m3u8.MEDIA:
+		return hls.NewMedia(request).WithPlaylistURL(playlistURL), nil
+	case m3u8.MASTER:
+		return hls.NewMaster(request, maxBandwidth).WithPlaylist(playlist), nil
+	default:
+		return nil, fmt.Errorf("invalid playlist list type found at %s", playlistURL)
 	}
-
-	if playlist.listType == m3u8.MASTER {
-		masterPlaylist, ok := playlist.playlist.(*m3u8.MasterPlaylist)
-		if !ok {
-			return fmt.Errorf("cannot assert to a master playlist")
-		}
-
-		hlsMaster := hlsMaster{
-			playlist:     masterPlaylist,
-			referenceURL: playlist.requestURL,
-			hlsMedia:     hlsMedia,
-			maxBandwidth: r.MaxBandwidth,
-		}
-
-		r.SegmentProvider = &hlsMaster
-		return nil
-	}
-
-	return errors.New("invalid playlist list type")
 }

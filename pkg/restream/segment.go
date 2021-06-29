@@ -6,8 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"time"
+
+	"github.com/shaunschembri/restreamer/pkg/restream/request"
 )
 
 const decrypterBuffer = 32768
@@ -18,16 +19,13 @@ func (r *Restream) getSegments(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case segment := <-r.segments:
-			switch segment.keyMethod {
+			switch segment.KeyMethod {
 			case "AES-128":
 				r.decrypter = &aes128{
-					iv:         segment.iv,
-					keyURL:     segment.keyURL,
+					iv:         segment.IV,
+					keyURL:     segment.KeyURL,
 					bufferSize: decrypterBuffer,
-					request: request{
-						userAgent: r.UserAgent,
-						client:    &http.Client{},
-					},
+					request:    request.New(r.UserAgent),
 				}
 
 				if err := r.decrypter.init(ctx); err != nil {
@@ -39,11 +37,11 @@ func (r *Restream) getSegments(ctx context.Context) {
 				r.decrypter = nil
 			default:
 				r.decrypter = nil
-				r.errors <- fmt.Errorf("key method %s is not supported", segment.keyMethod)
+				r.errors <- fmt.Errorf("key method %s is not supported", segment.KeyMethod)
 				return
 			}
 
-			if err := r.writeSegment(ctx, segment.url); err != nil {
+			if err := r.writeSegment(ctx, segment.URL); err != nil {
 				r.errors <- err
 				return
 			}
@@ -52,14 +50,10 @@ func (r *Restream) getSegments(ctx context.Context) {
 }
 
 func (r *Restream) writeSegment(ctx context.Context, url string) error {
-	request := request{
-		userAgent: r.UserAgent,
-		client:    &http.Client{},
-	}
-
-	response, err := request.do(ctx, url)
+	request := request.New(r.UserAgent)
+	response, err := request.Do(ctx, url)
 	if err != nil {
-		return err
+		return fmt.Errorf("request failed: %w", err)
 	}
 	defer response.Body.Close()
 

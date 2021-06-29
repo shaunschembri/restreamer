@@ -3,7 +3,8 @@ package restream
 import (
 	"context"
 	"io"
-	"time"
+
+	"github.com/shaunschembri/restreamer/pkg/restream/provider"
 )
 
 const (
@@ -17,30 +18,17 @@ type Restream struct {
 	UserAgent        string
 	MaxBandwidth     uint32
 	Writer           io.Writer
-	SegmentProvider  SegmentProvider
+	SegmentProvider  provider.Provider
 	ReadBufferSize   int
 	streamedBytes    int64
 	currentBandwidth uint32
-	segments         chan segment
+	segments         chan provider.Segment
 	errors           chan error
 	decrypter        decrypter
 }
 
-type segment struct {
-	url       string
-	keyMethod string
-	keyURL    string
-	iv        string
-	duration  float64
-}
-
-type SegmentProvider interface {
-	Get(ctx context.Context, bandwidth uint32) ([]segment, time.Duration, error)
-	Info() string
-}
-
 func (r *Restream) init(ctx context.Context, playlistURL string) error {
-	r.segments = make(chan segment, 1024)
+	r.segments = make(chan provider.Segment, 1024)
 	r.errors = make(chan error, 1024)
 
 	if r.MaxBandwidth == 0 {
@@ -57,9 +45,12 @@ func (r *Restream) init(ctx context.Context, playlistURL string) error {
 	}
 
 	if r.SegmentProvider == nil {
-		if err := r.getSegmentProvider(ctx, playlistURL); err != nil {
+		segmentProvider, err := r.detectStream(ctx, playlistURL, r.UserAgent, r.MaxBandwidth)
+		if err != nil {
 			return err
 		}
+
+		r.SegmentProvider = segmentProvider
 	}
 
 	return nil

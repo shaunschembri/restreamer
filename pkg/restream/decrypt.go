@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"strings"
+
+	"github.com/shaunschembri/restreamer/pkg/restream/request"
 )
 
 type decrypter interface {
@@ -20,7 +22,7 @@ type aes128 struct {
 	iv         string
 	keyURL     string
 	bufferSize int
-	request    request
+	request    request.Request
 	mode       cipher.BlockMode
 }
 
@@ -29,9 +31,9 @@ func (a aes128) info() string {
 }
 
 func (a *aes128) init(ctx context.Context) error {
-	keyFileResponse, err := a.request.do(ctx, a.keyURL)
+	keyFileResponse, err := a.request.Do(ctx, a.keyURL)
 	if err != nil {
-		return err
+		return fmt.Errorf("request failed: %w", err)
 	}
 	defer keyFileResponse.Body.Close()
 
