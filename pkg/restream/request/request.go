@@ -39,7 +39,7 @@ func (r Request) Do(ctx context.Context, requestURL string) (*http.Response, err
 				return response, nil
 			}
 
-			if response.StatusCode != http.StatusNotFound {
+			if response.StatusCode != http.StatusNotFound && response.StatusCode != http.StatusForbidden {
 				log.Printf("request to %s failed with status code %d. Will retry in 1 second", requestURL, response.StatusCode)
 				time.Sleep(time.Second)
 				continue
